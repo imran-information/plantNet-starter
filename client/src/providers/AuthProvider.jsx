@@ -55,7 +55,12 @@ const AuthProvider = ({ children }) => {
       console.log('CurrentUser-->', currentUser?.email)
       if (currentUser?.email) {
         setUser(currentUser)
-
+        // save user to db if not exists
+        await axios.post(`${import.meta.env.VITE_API_URL}/users/${currentUser?.email}`, {
+          email: currentUser?.email,
+          name: currentUser?.displayName,
+          photo: currentUser?.photoURL,
+        })
         // Get JWT token
         await axios.post(
           `${import.meta.env.VITE_API_URL}/jwt`,

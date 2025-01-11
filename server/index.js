@@ -47,6 +47,11 @@ const client = new MongoClient(uri, {
 })
 async function run() {
   try {
+    // plantNet db collections 
+    const db = client.db('plantNet')
+    const usersCollection = db.collection('users');
+    const plantsCollection = db.collection('plants')
+
     // Generate jwt token
     app.post('/jwt', async (req, res) => {
       const email = req.body
@@ -75,9 +80,49 @@ async function run() {
         res.status(500).send(err)
       }
     })
+    // save or update a user db
+    app.post('/users/:email', async (req, res) => {
+      try {
+        const email = req.params.email;
+        const newUser = req.body
+        const exitUser = await usersCollection.findOne({ email: email });
+        if (exitUser) {
+          res.send({ message: 'user already exist' })
+          return;
+        }
+        const result = await usersCollection.insertOne({ ...newUser, role: 'customer', timestamp: new Date() })
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // save a plant db
+    app.post('/plants', verifyToken, async (req, res) => {
+      try {
+        const plant = req.body;
+        const result = await plantsCollection.insertOne(plant);
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // get all plant data 
+    app.get('/plants', async (req, res) => {
+      try {
+        const result = await plantsCollection.find().toArray()
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+
+
+
+
+
 
     // Send a ping to confirm a successful connection
-    await client.db('admin').command({ ping: 1 })
+    // await client.db('admin').command({ ping: 1 })
     console.log(
       'Pinged your deployment. You successfully connected to MongoDB!'
     )

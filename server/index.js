@@ -51,6 +51,7 @@ async function run() {
     const db = client.db('plantNet')
     const usersCollection = db.collection('users');
     const plantsCollection = db.collection('plants')
+    const ordersCollection = db.collection('orders')
 
     // Generate jwt token
     app.post('/jwt', async (req, res) => {
@@ -116,7 +117,106 @@ async function run() {
       }
     })
 
+    // get a plant data by id
+    app.get('/plants/:id', async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) }
+        const result = await plantsCollection.findOne(query)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // save a plant order db 
+    app.post('/orders', verifyToken, async (req, res) => {
+      try {
+        const orderInfo = req.body;
+        // console.log(orderInfo);
+        const result = await ordersCollection.insertOne(orderInfo);
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // decrease a plant quantity data by id
+    app.patch('/plants/quantity/:id', verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { updatedQuantity } = req.body;
+        // console.log(updatedQuantity);
+        const query = { _id: new ObjectId(id) }
+        const updateDoc = {
+          $inc: {
+            quantity: -updatedQuantity
+          },
+        }
+        const result = await plantsCollection.updateOne(query, updateDoc)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
 
+    // specific user  get all orders data Using aggregation
+    app.get('/orders/:email', verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const result = await ordersCollection.aggregate([
+          {
+            $match: { 'customer.email': email }
+          },
+          {
+            $addFields: {
+              plantId: { $toObjectId: '$plantId' },
+            },
+          },
+          {
+            $lookup: {
+              from: 'plants',
+              localField: 'plantId',
+              foreignField: '_id',
+              as: 'plants',
+            }
+          },
+          {
+            $unwind: '$plants'
+          },
+          {
+            $addFields: {
+              name: '$plants.name',
+              category: '$plants.category',
+              image: '$plants.image',
+            }
+          },
+          {
+            $project: {
+              plants: 0
+            }
+          }
+        ]).toArray()
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // order cancel/delete by id 
+    app.delete('/orders/:id', verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) }
+        const { status } = await ordersCollection.findOne(query)
+        console.log(status);
+        if (status === 'delivered') {
+          return res.status(409).send({ message: 'order already delivered' })
+
+        }
+        const result = await ordersCollection.deleteOne(query)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
 
 
 

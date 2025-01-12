@@ -7,15 +7,18 @@ const CustomerOrderDataRow = ({ order, refetch }) => {
   let [isOpen, setIsOpen] = useState(false)
   const closeModal = () => setIsOpen(false)
   const axiosSecure = useAxiosSecure()
-  const { _id, name, category, price, quantity, status, image } = order;
+  const { _id, name, category, price, quantity, status, image, plantId } = order;
 
   // handle the delete/cancel action of the order 
   const handleDelete = async () => {
     console.log(_id);
     try {
       await axiosSecure.delete(`/orders/${_id}`)
-      refetch()
+      toast.success('Order cancelled successfully')
+      // decree the quantity of the planet by the quantity of the order 
+      axiosSecure.patch(`/plants/quantity/${plantId}`, { updatedQuantity: quantity, status: 'increase' })
 
+      refetch() // refetch the data to update the UI
     } catch (error) {
       toast.error(error?.response?.data?.message)
     } finally {

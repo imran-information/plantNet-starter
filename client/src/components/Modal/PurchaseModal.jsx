@@ -51,7 +51,7 @@ const PurchaseModal = ({ refetch, closeModal, isOpen, plant }) => {
         email: user.email,
         image: user?.photoURL
       },
-      status: 'pending',
+      status: 'Pending',
     }
     // console.log(orderInfo);
     // Send order to the backend

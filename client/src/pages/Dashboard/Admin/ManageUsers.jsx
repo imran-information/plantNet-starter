@@ -1,7 +1,18 @@
 import { Helmet } from 'react-helmet-async'
 import UserDataRow from '../../../components/Dashboard/TableRows/UserDataRow'
+import { useQuery } from '@tanstack/react-query'
 
 const ManageUsers = () => {
+  // const { data: users, loading, error } = useQuery({
+  //   queryKey: ['users'],
+  //   queryFn: async () => {
+  //     const { data } = await axios.get('/api/users')
+  //   }
+  // })
+
+
+
+
   return (
     <>
       <div className='container mx-auto px-4 sm:px-8'>

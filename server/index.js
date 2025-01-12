@@ -97,6 +97,47 @@ async function run() {
         res.status(500).send(err)
       }
     })
+
+    // get all user data 
+    app.get('/users', async (req, res) => {
+      try {
+        const result = await usersCollection.find().toArray()
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+    // get role specific user  
+    app.get('/users/role/:email', verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const { role } = await usersCollection.findOne({ email })
+        res.send(role)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+
+
+    // customer update role request send to admin
+    app.patch('/users/:email', verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const query = { email: email }
+        const user = await usersCollection.findOne(query)
+        if (!user || user.status === 'Requested') return res.status(409).send({ message: 'You Have already requested, please wait some time' })
+        const updateDoc = {
+          $set: {
+            status: 'Requested',
+          }
+        }
+        const result = await usersCollection.updateOne(query, updateDoc)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+
     // save a plant db
     app.post('/plants', verifyToken, async (req, res) => {
       try {
@@ -118,7 +159,7 @@ async function run() {
     })
 
     // get a plant data by id
-    app.get('/plants/:id', async (req, res) => {
+    app.get('/plants/:id', verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) }
@@ -139,17 +180,24 @@ async function run() {
         res.status(500).send(err)
       }
     })
-    // decrease a plant quantity data by id
+    // increase/decrease a plant quantity data by id 
     app.patch('/plants/quantity/:id', verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
-        const { updatedQuantity } = req.body;
+        const { updatedQuantity, status } = req.body;
         // console.log(updatedQuantity);
         const query = { _id: new ObjectId(id) }
-        const updateDoc = {
+        let updateDoc = {
           $inc: {
             quantity: -updatedQuantity
           },
+        }
+        if (status === 'increase') {
+          updateDoc = {
+            $inc: {
+              quantity: updatedQuantity
+            },
+          }
         }
         const result = await plantsCollection.updateOne(query, updateDoc)
         res.send(result)
@@ -207,8 +255,8 @@ async function run() {
         const query = { _id: new ObjectId(id) }
         const { status } = await ordersCollection.findOne(query)
         console.log(status);
-        if (status === 'delivered') {
-          return res.status(409).send({ message: 'order already delivered' })
+        if (status === 'Delivered') {
+          return res.status(409).send({ message: 'Your Order already delivered..' })
 
         }
         const result = await ordersCollection.deleteOne(query)

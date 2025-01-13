@@ -1,5 +1,6 @@
 import PropTypes from "prop-types";
 import { TbFidgetSpinner } from "react-icons/tb";
+import { shortImageName } from "../../utilities";
 
 const AddPlantForm = ({ handleSubmit, postLoading, image, setImage, setPreview, preview }) => {
 
@@ -111,10 +112,14 @@ const AddPlantForm = ({ handleSubmit, postLoading, image, setImage, setPreview, 
                       hidden
                     />
                     <div className='bg-lime-500 text-white border border-gray-300 rounded font-semibold cursor-pointer p-1 px-3 hover:bg-lime-500'>
-                      {
+                      {/* {
                         image.name
                           ? image.name
                           : 'Select Image'
+
+                      } */}
+                      {
+                        shortImageName(image)
                       }
                     </div>
                     {preview ? (

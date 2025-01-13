@@ -1,8 +1,22 @@
 import { Helmet } from 'react-helmet-async'
 
 import SellerOrderDataRow from '../../../components/Dashboard/TableRows/SellerOrderDataRow'
+import useAxiosSecure from '../../../hooks/useAxiosSecure'
+import { useQuery } from '@tanstack/react-query'
+import LoadingSpinner from '../../../components/Shared/LoadingSpinner'
 
 const ManageOrders = () => {
+  const axiosSecure = useAxiosSecure()
+  const { data: orders = [], isLoading, refetch } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const { data } = await axiosSecure.get('/orders')
+      return data
+    }
+  })
+
+  if (isLoading) return <LoadingSpinner />
+
   return (
     <>
       <Helmet>
@@ -61,7 +75,9 @@ const ManageOrders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <SellerOrderDataRow />
+                  {
+                    orders.map(order => <SellerOrderDataRow key={order._id} order={order} refetch={refetch} />)
+                  }
                 </tbody>
               </table>
             </div>

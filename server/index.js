@@ -6,6 +6,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
 
+
 const port = process.env.PORT || 9000
 const app = express()
 // middleware
@@ -53,6 +54,25 @@ async function run() {
     const plantsCollection = db.collection('plants')
     const ordersCollection = db.collection('orders')
 
+    // verify Admin middleware 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.user.email;
+      const user = await usersCollection.findOne({ email })
+      if (!user || user.role !== 'admin') {
+        return res.status(401).send({ message: 'Unauthorized access' })
+      }
+      next()
+    }
+    // verify Seller middleware 
+    const verifySeller = async (req, res, next) => {
+      const email = req.user.email;
+      const user = await usersCollection.findOne({ email })
+      if (!user || user.role !== 'seller') {
+        return res.status(401).send({ message: 'Unauthorized access' })
+      }
+      next()
+    }
+
     // Generate jwt token
     app.post('/jwt', async (req, res) => {
       const email = req.body
@@ -81,6 +101,7 @@ async function run() {
         res.status(500).send(err)
       }
     })
+
     // save or update a user db
     app.post('/users/:email', async (req, res) => {
       try {
@@ -99,9 +120,16 @@ async function run() {
     })
 
     // get all user data 
-    app.get('/users', async (req, res) => {
+    app.get('/users/:email', verifyToken, verifyAdmin, async (req, res) => {
       try {
-        const result = await usersCollection.find().toArray()
+        const email = req.params.email;
+        console.log(email);
+        const query = {
+          email: {
+            $ne: email
+          }
+        }
+        const result = await usersCollection.find(query).toArray()
         res.send(result)
       } catch (err) {
         res.status(500).send(err)
@@ -118,7 +146,24 @@ async function run() {
       }
     })
 
-
+    // update & modify a user role by admin
+    app.patch('/users/role/:email', verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const { role } = req.body;
+        const query = { email: email };
+        const updateDoc = {
+          $set: {
+            role: role,
+            status: 'Verified',
+          },
+        };
+        const result = await usersCollection.updateOne(query, updateDoc);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send(err);
+      }
+    });
     // customer update role request send to admin
     app.patch('/users/:email', verifyToken, async (req, res) => {
       try {
@@ -139,7 +184,7 @@ async function run() {
     })
 
     // save a plant db
-    app.post('/plants', verifyToken, async (req, res) => {
+    app.post('/plants', verifyToken, verifySeller, async (req, res) => {
       try {
         const plant = req.body;
         const result = await plantsCollection.insertOne(plant);
@@ -148,6 +193,32 @@ async function run() {
         res.status(500).send(err)
       }
     })
+
+    // a seller specific get all plant data
+    app.get('/plants/seller', verifyToken, verifySeller, async (req, res) => {
+      try {
+        const email = req.user.email;
+        const query = { 'seller.email': email }
+        const result = await plantsCollection.find(query).toArray()
+        res.send(result)
+      } catch (err) {
+        res.status(500).send
+      }
+    })
+
+    // delete a plant data by id
+    app.delete('/plants/:id', verifyToken, verifySeller, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) }
+        const result = await plantsCollection.deleteOne(query)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
+
+
     // get all plant data 
     app.get('/plants', async (req, res) => {
       try {
@@ -157,9 +228,8 @@ async function run() {
         res.status(500).send(err)
       }
     })
-
     // get a plant data by id
-    app.get('/plants/:id', verifyToken, async (req, res) => {
+    app.get('/plants/:id', async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) }
@@ -205,8 +275,7 @@ async function run() {
         res.status(500).send(err)
       }
     })
-
-    // specific user  get all orders data Using aggregation
+    // specific customer  get all orders data Using aggregation
     app.get('/orders/:email', verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
@@ -248,6 +317,48 @@ async function run() {
         res.status(500).send(err)
       }
     })
+
+    // specific seller/:email  get all orders data Using aggregation
+    app.get('/orders', verifyToken, verifySeller, async (req, res) => {
+      try {
+        const email = req.user.email;
+        console.log(email);
+        const result = await ordersCollection.aggregate([
+          {
+            $match: { 'seller.email': email }
+          },
+          {
+            $addFields: {
+              plantId: { $toObjectId: '$plantId' },
+            },
+          },
+          {
+            $lookup: {
+              from: 'plants',
+              localField: 'plantId',
+              foreignField: '_id',
+              as: 'plants',
+            }
+          },
+          {
+            $unwind: '$plants'
+          },
+          {
+            $addFields: {
+              name: '$plants.name',
+            }
+          },
+          {
+            $project: {
+              plants: 0
+            }
+          }
+        ]).toArray()
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
     // order cancel/delete by id 
     app.delete('/orders/:id', verifyToken, async (req, res) => {
       try {
@@ -266,6 +377,23 @@ async function run() {
       }
     })
 
+    // update a order status by id
+    app.patch('/orders/status/:id', verifyToken, verifySeller, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { status } = req.body;
+        const query = { _id: new ObjectId(id) }
+        const updateDoc = {
+          $set: {
+            status: status,
+          }
+        }
+        const result = await ordersCollection.updateOne(query, updateDoc)
+        res.send(result)
+      } catch (err) {
+        res.status(500).send(err)
+      }
+    })
 
 
 
